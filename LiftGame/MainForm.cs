@@ -14,8 +14,30 @@ using System.Threading;
 
 namespace LiftGame
 {
+
+	public static class ExFunc
+	{
+		public static Kernel MakeCode(this Context oContext, string Name, string Code)
+		{
+			Program oclProgram = oContext.CreateProgramWithSource(Code);
+			try
+			{
+				oclProgram.Build();
+			}
+			catch (OpenCLBuildException EEE)
+			{
+				MessageBox.Show(EEE.BuildLogs[0]);
+				throw EEE;
+			}
+			var Kernelobj = oclProgram.CreateKernel(Name);
+			oclProgram.Dispose();
+			return Kernelobj;
+		}
+
+	}
+
 	public partial class MainForm : Form
-	{ 
+	{
 		private static Platform platform = null;//平台
 		private static Device oclDevice = null;//选中运算设备
 		private static Kernel FilterKernel = null;
@@ -24,26 +46,10 @@ namespace LiftGame
 		private static Sampler sampler = null;
 		private static CL.Image OutImage1 = null, OutImage2 = null;
 		private static List<string> CallBackEventList = new List<string>();
-		private static Bitmap TestImage = (Bitmap)Bitmap.FromFile(@"01.bmp");
+		private static Bitmap TestImage = (Bitmap)System.Drawing.Image.FromFile(@"01.bmp");
 
-		private static void Main()
-		{
-			OpenCL.GetPlatformIDs(32, new IntPtr[32], out uint num_platforms);
-			List<Device> pt = new List<Device>();
-			for (int i = 0; i < num_platforms; pt.AddRange(OpenCL.GetPlatform(i++).QueryDevices(DeviceType.ALL))) ;
-
-			int PT = SelectForm.Show((from Device d in pt select d.Name).ToArray());
-			if (PT == -1) return;
-			platform = pt[PT].Platform;//平台
-			oclDevice = pt[PT];//选中运算设备
-			oclContext = platform.CreateContext(new[] { (IntPtr)ContextProperties.PLATFORM, platform.PlatformID, IntPtr.Zero, IntPtr.Zero }, new[] { oclDevice }, new ContextNotify(OpenCLContextNotifyCallBack), IntPtr.Zero);//根据配置建立上下文
-			oclCQ = oclContext.CreateCommandQueue(oclDevice, CommandQueueProperties.PROFILING_ENABLE);//创建请求队列
-			if (!oclDevice.ImageSupport) return;//如果失败返回
-			if (!oclContext.SupportsImageFormat(MemFlags.READ_WRITE, MemObjectType.IMAGE2D, ChannelOrder.RGBA, ChannelType.UNSIGNED_INT8)) return;
-			sampler = oclContext.CreateSampler(true, AddressingMode.NONE, FilterMode.NEAREST);
-
-			#region 传入代码编译程序
-			string CLCode = @"
+		#region Code1
+		private static string CLCode1 = @"
 bool TestPoint(float x,float y,read_only image2d_t input,sampler_t sampler)
 {
 	if(x<0||y<0)return false;
@@ -95,11 +101,38 @@ kernel void FilterImage(float outputWidth,float outputHeight,read_only image2d_t
 	}
 	write_imageui(output,convert_int2((float2)(x,y)),(AX==3)?BBGRA:WBGRA);
 }";
-			OpenCLNet.Program oclProgram = oclContext.CreateProgramWithSource(CLCode);
-			oclProgram.Build();
-			FilterKernel = oclProgram.CreateKernel("FilterImage");
-			oclProgram.Dispose();
-			#endregion
+		#endregion
+
+		#region Code2
+		private static string CLCode2 = @"
+__kernel void vector_add_gpu (	__global float* src_a,  
+								__global float* src_b,  
+								__global float* res,  
+								int num)
+{
+   const int idx = get_global_id(0);
+   if (idx < num) res[idx] = src_a[idx] + src_b[idx];
+	 //src_a[idx]=15;
+}";
+		#endregion
+
+		private static void Main()
+		{
+			OpenCL.GetPlatformIDs(32, new IntPtr[32], out uint num_platforms);
+			List<Device> pt = new List<Device>();
+			for (int i = 0; i < num_platforms; pt.AddRange(OpenCL.GetPlatform(i++).QueryDevices(DeviceType.ALL))) ;
+
+			int PT = SelectForm.Show((from Device d in pt select d.Name).ToArray());
+			if (PT == -1) return;
+			platform = pt[PT].Platform;//平台
+			oclDevice = pt[PT];//选中运算设备
+			oclContext = platform.CreateContext(new[] { (IntPtr)ContextProperties.PLATFORM, platform.PlatformID, IntPtr.Zero, IntPtr.Zero }, new[] { oclDevice }, new ContextNotify(OpenCLContextNotifyCallBack), IntPtr.Zero);//根据配置建立上下文
+			oclCQ = oclContext.CreateCommandQueue(oclDevice, CommandQueueProperties.PROFILING_ENABLE);//创建请求队列
+			if (!oclDevice.ImageSupport) return;//如果失败返回
+			if (!oclContext.SupportsImageFormat(MemFlags.READ_WRITE, MemObjectType.IMAGE2D, ChannelOrder.RGBA, ChannelType.UNSIGNED_INT8)) return;
+			sampler = oclContext.CreateSampler(true, AddressingMode.NONE, FilterMode.NEAREST);
+			FilterKernel = oclContext.MakeCode("FilterImage", CLCode1);
+			Kernel K2 = oclContext.MakeCode("vector_add_gpu", CLCode2);
 
 			OutImage1 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
 			OutImage2 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
@@ -116,8 +149,7 @@ kernel void FilterImage(float outputWidth,float outputHeight,read_only image2d_t
 			// */
 			#endregion
 
-			MainForm MF = new MainForm();
-			MF.ShowDialog();
+			new MainForm().ShowDialog();
 			Application.Exit();
 		}
 
