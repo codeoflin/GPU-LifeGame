@@ -224,8 +224,7 @@ namespace OpenCLNet
 			if (result != ErrorCode.SUCCESS) throw new OpenCLException("CreateKernels failed with error code " + result, result);
 
 			Kernel[] kernels = new Kernel[numKernels];
-			for (int i = 0; i < kernels.Length; i++)
-				kernels[i] = new Kernel(Context, this, kernelIDs[i]);
+			for (int i = 0; i < kernels.Length; i++) kernels[i] = new Kernel(Context, this, kernelIDs[i]);
 			return kernels;
 		}
 
@@ -282,7 +281,7 @@ namespace OpenCLNet
 			{
 				IntPtr size;
 				ErrorCode result = OpenCL.GetProgramBuildInfo(Program.ProgramID, Device.DeviceID, key, IntPtr.Zero, null, out size); ;
-				
+
 				if (result != ErrorCode.SUCCESS) throw new OpenCLException("clGetProgramBuildInfo failed with error code " + result, result);
 
 				return size;
@@ -294,8 +293,7 @@ namespace OpenCLNet
 				IntPtr size;
 
 				result = (ErrorCode)OpenCL.GetProgramBuildInfo(Program.ProgramID, Device.DeviceID, key, keyLength, pBuffer, out size);
-				if (result != ErrorCode.SUCCESS)
-					throw new OpenCLException("clGetProgramBuildInfo failed with error code " + result, result);
+				if (result != ErrorCode.SUCCESS) throw new OpenCLException("clGetProgramBuildInfo failed with error code " + result, result);
 			}
 
 			#endregion

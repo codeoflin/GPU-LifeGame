@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using OpenCLNet;
 using CL = OpenCLNet;
+using System.Windows.Forms;
 
 namespace LiftGame
 {
@@ -37,6 +38,24 @@ namespace LiftGame
 			return bitmap;
 		}
 
+		/// <summary>
+		/// 想着不做内存拷贝,直接读取数据的,失败了 by 林子
+		/// </summary>
+		/// <param name="oclContext"></param>
+		/// <param name="oclCQ"></param>
+		/// <param name="oclBitmap"></param>
+		/// <returns></returns>
+		public static Bitmap ToBitmap2(this Context oclContext, CommandQueue oclCQ, CL.Image oclBitmap)
+		{
+			Bitmap bitmap = new Bitmap(oclBitmap.Width.ToInt32(), oclBitmap.Height.ToInt32(), PixelFormat.Format32bppArgb);
+			BitmapData bd = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+			IntPtr p = oclCQ.EnqueueMapBuffer(oclBitmap, true, MapFlags.READ, IntPtr.Zero, (IntPtr)(bd.Height * bd.Stride));
+			oclCQ.EnqueueBarrier();
+			oclCQ.Finish();
+			bitmap.UnlockBits(bd);
+			return bitmap;
+		}
+
 		public static int[] ToInts(this Context oclContext, CommandQueue oclCQ, CL.Mem oclBuff, int Len)
 		{
 			int[] Ints = new int[Len];
@@ -52,18 +71,55 @@ namespace LiftGame
 			return Ints;
 		}
 
-		public static float[] Tofloats(this Context oclContext, CommandQueue oclCQ, CL.Mem oclBuff, int Len)
+		public static Kernel MakeCode(this Context oContext, string Name, string Code)
+		{
+			Program oclProgram = oContext.CreateProgramWithSource(Code);
+			try
+			{
+				oclProgram.Build();
+			}
+			catch (OpenCLBuildException EEE)
+			{
+				MessageBox.Show(EEE.BuildLogs[0]);
+				throw EEE;
+			}
+			var Kernelobj = oclProgram.CreateKernel(Name);
+			oclProgram.Dispose();
+			return Kernelobj;
+		}
+
+		public static float[] ReadFloatValues(this Context oclContext, CommandQueue oclCQ, CL.Mem oclBuff, int Len)
 		{
 			float[] floats = new float[Len];
-			Mem buffer = oclContext.CreateBuffer((MemFlags.WRITE_ONLY | MemFlags.USE_HOST_PTR), Len, floats.ToIntPtr());
-			//oclCQ.EnqueueCopyBuffer(oclBuff, buffer, 0, 0, Len);
 			oclCQ.EnqueueReadBuffer(oclBuff, true, 0, Len, floats.ToIntPtr());
 			oclCQ.EnqueueBarrier();
-			IntPtr p = oclCQ.EnqueueMapBuffer(buffer, true, MapFlags.READ, 0, Len);
-			oclCQ.EnqueueUnmapMemObject(buffer, p);
 			oclCQ.Finish();
-			buffer.Dispose();
 			return floats;
+		}
+
+		public static void WriterValues(this Context oclContext, CommandQueue oclCQ, CL.Mem oclBuff, float[] values)
+		{
+			oclCQ.EnqueueWriteBuffer(oclBuff, true, 0, values.Length, values.ToIntPtr());
+			oclCQ.EnqueueBarrier();
+			oclCQ.Finish();
+			return;
+		}
+
+		public static int[] ReadIntValues(this Context oclContext, CommandQueue oclCQ, CL.Mem oclBuff, int Len)
+		{
+			int[] values = new int[Len];
+			oclCQ.EnqueueReadBuffer(oclBuff, true, 0, Len, values.ToIntPtr());
+			oclCQ.EnqueueBarrier();
+			oclCQ.Finish();
+			return values;
+		}
+
+		public static void WriterValues(this Context oclContext, CommandQueue oclCQ, CL.Mem oclBuff, int[] values)
+		{
+			oclCQ.EnqueueWriteBuffer(oclBuff, true, 0, values.Length, values.ToIntPtr());
+			oclCQ.EnqueueBarrier();
+			oclCQ.Finish();
+			return;
 		}
 
 
@@ -79,12 +135,7 @@ namespace LiftGame
 
 		public static unsafe IntPtr ToIntPtr(this float[] obj)
 		{
-			IntPtr PtrA = IntPtr.Zero;
-			fixed (float* Ap = obj)
-			{
-				PtrA = new IntPtr(Ap);
-			}
-			return PtrA;
+			fixed (float* Ap = obj) return new IntPtr(Ap);
 		}
 	}//End Class
 }

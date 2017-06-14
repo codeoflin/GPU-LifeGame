@@ -15,27 +15,6 @@ using System.Threading;
 namespace LiftGame
 {
 
-	public static class ExFunc
-	{
-		public static Kernel MakeCode(this Context oContext, string Name, string Code)
-		{
-			Program oclProgram = oContext.CreateProgramWithSource(Code);
-			try
-			{
-				oclProgram.Build();
-			}
-			catch (OpenCLBuildException EEE)
-			{
-				MessageBox.Show(EEE.BuildLogs[0]);
-				throw EEE;
-			}
-			var Kernelobj = oclProgram.CreateKernel(Name);
-			oclProgram.Dispose();
-			return Kernelobj;
-		}
-
-	}
-
 	public partial class MainForm : Form
 	{
 		private static Platform platform = null;//平台
@@ -105,14 +84,10 @@ kernel void FilterImage(float outputWidth,float outputHeight,read_only image2d_t
 
 		#region Code2
 		private static string CLCode2 = @"
-__kernel void vector_add_gpu (	__global float* src_a,  
-								__global float* src_b,  
-								__global float* res,  
-								int num)
+__kernel void vector_add_gpu(__global int* src_a, __global int* src_b, __global int* res, int num)
 {
    const int idx = get_global_id(0);
-   if (idx < num) res[idx] = src_a[idx] + src_b[idx];
-	 //src_a[idx]=15;
+   res[idx] =1;//src_a[idx] + src_b[idx];
 }";
 		#endregion
 
@@ -121,8 +96,7 @@ __kernel void vector_add_gpu (	__global float* src_a,
 			OpenCL.GetPlatformIDs(32, new IntPtr[32], out uint num_platforms);
 			List<Device> pt = new List<Device>();
 			for (int i = 0; i < num_platforms; pt.AddRange(OpenCL.GetPlatform(i++).QueryDevices(DeviceType.ALL))) ;
-
-			int PT = SelectForm.Show((from Device d in pt select d.Name).ToArray());
+			int PT = 0;// SelectForm.Show((from Device d in pt select d.Name).ToArray());
 			if (PT == -1) return;
 			platform = pt[PT].Platform;//平台
 			oclDevice = pt[PT];//选中运算设备
@@ -134,10 +108,32 @@ __kernel void vector_add_gpu (	__global float* src_a,
 			FilterKernel = oclContext.MakeCode("FilterImage", CLCode1);
 			Kernel K2 = oclContext.MakeCode("vector_add_gpu", CLCode2);
 
-			OutImage1 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
-			OutImage2 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
+			#region 
+			int[] A = new[] { 1,2,3 };
+			int[] B = new[] { 456,2,1 };
+			int[] C = new[] { 0,0,0 };
+			CL.Mem n1 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, A.Length, A.ToIntPtr());
+			CL.Mem n2 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, B.Length, B.ToIntPtr());
+			CL.Mem n3 = oclContext.CreateBuffer(MemFlags.READ_WRITE, 3, IntPtr.Zero);
+			/*
+			K2.SetArg(0, n1);
+			K2.SetArg(1, n2);
+			K2.SetArg(2, n3);
+			K2.SetArg(3, (int)3);
+			oclCQ.EnqueueNDRangeKernel(K2, 1, null, new[] { 3, 0 }, null);
+			oclCQ.EnqueueBarrier();
+			oclCQ.Finish();
+			// */
+			oclContext.WriterValues(oclCQ, n3, B);
+			C = oclContext.ReadIntValues(oclCQ, n1, C.Length);
+			
+			C = C;
+			// */
+			#endregion
 
 			#region 调用编译好的程序
+			OutImage1 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
+			OutImage2 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
 			FilterKernel.SetArg(0, 1.0f);
 			FilterKernel.SetArg(1, 1.0f);
 			FilterKernel.SetArg(2, oclContext.ToCLImage(TestImage));
