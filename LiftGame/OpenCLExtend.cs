@@ -99,7 +99,7 @@ namespace LiftGame
 
 		public static void WriterValues(this Context oclContext, CommandQueue oclCQ, CL.Mem oclBuff, float[] values)
 		{
-			oclCQ.EnqueueWriteBuffer(oclBuff, true, 0, values.Length, values.ToIntPtr());
+			oclCQ.EnqueueWriteBuffer(oclBuff, true, 0, values.Length * sizeof(int), values.ToIntPtr());
 			oclCQ.EnqueueBarrier();
 			oclCQ.Finish();
 			return;
@@ -108,7 +108,7 @@ namespace LiftGame
 		public static int[] ReadIntValues(this Context oclContext, CommandQueue oclCQ, CL.Mem oclBuff, int Len)
 		{
 			int[] values = new int[Len];
-			oclCQ.EnqueueReadBuffer(oclBuff, true, 0, Len, values.ToIntPtr());
+			oclCQ.EnqueueReadBuffer(oclBuff, true, 0, Len * sizeof(int), values.ToIntPtr());
 			oclCQ.EnqueueBarrier();
 			oclCQ.Finish();
 			return values;
@@ -121,7 +121,6 @@ namespace LiftGame
 			oclCQ.Finish();
 			return;
 		}
-
 
 		public static unsafe IntPtr ToIntPtr(this int[] obj)
 		{

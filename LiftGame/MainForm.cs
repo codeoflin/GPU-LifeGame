@@ -87,7 +87,7 @@ kernel void FilterImage(float outputWidth,float outputHeight,read_only image2d_t
 __kernel void vector_add_gpu(__global int* src_a, __global int* src_b, __global int* res, int num)
 {
    const int idx = get_global_id(0);
-   res[idx] =1;//src_a[idx] + src_b[idx];
+   if(idx<num)res[idx] =src_a[idx] + src_b[idx];
 }";
 		#endregion
 
@@ -109,24 +109,23 @@ __kernel void vector_add_gpu(__global int* src_a, __global int* src_b, __global 
 			Kernel K2 = oclContext.MakeCode("vector_add_gpu", CLCode2);
 
 			#region 
-			int[] A = new[] { 1,2,3 };
-			int[] B = new[] { 456,2,1 };
-			int[] C = new[] { 0,0,0 };
-			CL.Mem n1 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, A.Length, A.ToIntPtr());
-			CL.Mem n2 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, B.Length, B.ToIntPtr());
-			CL.Mem n3 = oclContext.CreateBuffer(MemFlags.READ_WRITE, 3, IntPtr.Zero);
-			/*
+			int[] A = new[] { 1, 2, 3, 1722 };
+			int[] B = new[] { 456, 2, 1, 56 };
+			int[] C = new[] { 0, 0, 0, 0 };
+			CL.Mem n1 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, A.Length * sizeof(int), A.ToIntPtr());
+			CL.Mem n2 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, B.Length * sizeof(int), B.ToIntPtr());
+			CL.Mem n3 = oclContext.CreateBuffer(MemFlags.READ_WRITE, B.Length * sizeof(int), IntPtr.Zero);
 			K2.SetArg(0, n1);
 			K2.SetArg(1, n2);
 			K2.SetArg(2, n3);
-			K2.SetArg(3, (int)3);
-			oclCQ.EnqueueNDRangeKernel(K2, 1, null, new[] { 3, 0 }, null);
+			K2.SetArg(3, (int)C.Length);
+			oclCQ.EnqueueNDRangeKernel(K2, 1, null, new[] { C.Length, 0 }, null);
 			oclCQ.EnqueueBarrier();
 			oclCQ.Finish();
 			// */
-			oclContext.WriterValues(oclCQ, n3, B);
-			C = oclContext.ReadIntValues(oclCQ, n1, C.Length);
-			
+			//oclContext.WriterValues(oclCQ, n3, B);
+			C = oclContext.ReadIntValues(oclCQ, n3, C.Length);
+
 			C = C;
 			// */
 			#endregion
