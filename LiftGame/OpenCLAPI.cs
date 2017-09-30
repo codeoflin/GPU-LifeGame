@@ -330,9 +330,19 @@ namespace OpenCLNet
 		public extern static ErrorCode clSetKernelArg(cl_kernel kernel, cl_uint arg_index, IntPtr arg_size, void* arg_value);
 		[DllImport(Configuration.Library)]
 		public extern static ErrorCode clGetKernelInfo(cl_kernel kernel, cl_kernel_info param_name, IntPtr param_value_size, void* param_value, out IntPtr param_value_size_ret);
+
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="kernel"></param>
+		/// <param name="device"></param>
+		/// <param name="param_name"></param>
+		/// <param name="param_value_size"></param>
+		/// <param name="param_value"></param>
+		/// <param name="param_value_size_ret"></param>
+		/// <returns></returns>
 		[DllImport(Configuration.Library)]
 		public extern static ErrorCode clGetKernelWorkGroupInfo(cl_kernel kernel, cl_device_id device, cl_kernel_work_group_info param_name, IntPtr param_value_size, void* param_value, out IntPtr param_value_size_ret);
-
 		#endregion
 
 		#region Enqueued Commands API

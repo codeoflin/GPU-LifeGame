@@ -96,7 +96,7 @@ __kernel void vector_add_gpu(__global int* src_a, __global int* src_b, __global 
 			OpenCL.GetPlatformIDs(32, new IntPtr[32], out uint num_platforms);
 			List<Device> pt = new List<Device>();
 			for (int i = 0; i < num_platforms; pt.AddRange(OpenCL.GetPlatform(i++).QueryDevices(DeviceType.ALL))) ;
-			int PT = 0;// SelectForm.Show((from Device d in pt select d.Name).ToArray());
+			int PT = SelectForm.Show((from Device d in pt select d.Name).ToArray());
 			if (PT == -1) return;
 			platform = pt[PT].Platform;//平台
 			oclDevice = pt[PT];//选中运算设备
@@ -108,13 +108,16 @@ __kernel void vector_add_gpu(__global int* src_a, __global int* src_b, __global 
 			FilterKernel = oclContext.MakeCode("FilterImage", CLCode1);
 			Kernel K2 = oclContext.MakeCode("vector_add_gpu", CLCode2);
 
-			#region 
+			int aaa = K2.PECount(oclDevice);
+			aaa = aaa;
+			#region 试一下用GPU做运算
 			int[] A = new[] { 1, 2, 3, 1722 };
 			int[] B = new[] { 456, 2, 1, 56 };
 			int[] C = new[] { 0, 0, 0, 0 };
 			CL.Mem n1 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, A.Length * sizeof(int), A.ToIntPtr());
 			CL.Mem n2 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, B.Length * sizeof(int), B.ToIntPtr());
-			CL.Mem n3 = oclContext.CreateBuffer(MemFlags.READ_WRITE, B.Length * sizeof(int), IntPtr.Zero);
+			CL.Mem n3 = null;
+			unchecked { n3 = oclContext.CreateBuffer(MemFlags.READ_WRITE, B.Length * sizeof(int), IntPtr.Zero); }
 			K2.SetArg(0, n1);
 			K2.SetArg(1, n2);
 			K2.SetArg(2, n3);
@@ -130,21 +133,41 @@ __kernel void vector_add_gpu(__global int* src_a, __global int* src_b, __global 
 			// */
 			#endregion
 
-			#region 调用编译好的程序
-			OutImage1 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
-			OutImage2 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
-			FilterKernel.SetArg(0, 1.0f);
-			FilterKernel.SetArg(1, 1.0f);
-			FilterKernel.SetArg(2, oclContext.ToCLImage(TestImage));
-			FilterKernel.SetArg(3, OutImage1);
-			FilterKernel.SetArg(4, sampler);
-			oclCQ.EnqueueNDRangeKernel(FilterKernel, 2, null, new IntPtr[] { OutImage1.Width, OutImage1.Height, IntPtr.Zero }, null);
-			oclCQ.EnqueueBarrier();
-			oclCQ.Finish();
+			ShowDeviceInfo SDI = new ShowDeviceInfo();
+			ListBox.ObjectCollection lb = SDI.listBox1.Items;
+			lb.Add(string.Format("Name:{0}", oclDevice.Name));
+			lb.Add(string.Format("DeviceType:{0}", oclDevice.DeviceType.ToString()));
+			lb.Add(string.Format("MaxComputeUnits(最大计算单元):{0}", oclDevice.MaxComputeUnits));
+			lb.Add(string.Format("ImageSupport:{0}", oclDevice.ImageSupport));
+			lb.Add(string.Format("AddressBits:{0}", oclDevice.AddressBits));
+			lb.Add(string.Format("DriverVersion:{0}", oclDevice.DriverVersion));
+			lb.Add(string.Format("MaxClockFrequency(最大时钟频率):{0}MHz", oclDevice.MaxClockFrequency));
+			lb.Add(string.Format("MaxMemAllocSize:{0}", oclDevice.MaxMemAllocSize));
+			lb.Add(string.Format("MaxWorkItemDimensions(最大工作维度):{0}", oclDevice.MaxWorkItemDimensions));
+			lb.Add(string.Format("MaxWorkGroupSize:{0}", oclDevice.MaxWorkGroupSize));
+			lb.Add(string.Format("Version(OpenCL版本):{0}", oclDevice.Version));
+			lb.Add(string.Format("GlobalMemSize:{0}", oclDevice.GlobalMemSize));
+			lb.Add(string.Format("Vendor(厂商):{0}", oclDevice.Vendor));
+			lb.Add(string.Format("HostUnifiedMemory(是否和Host共用内存):{0}", oclDevice.HostUnifiedMemory));
+			//SDI.ShowDialog();
+			#region 调用编译好的生命游戏程序
+			if (oclDevice.DeviceType == DeviceType.GPU)
+			{
+				OutImage1 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
+				OutImage2 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
+				FilterKernel.SetArg(0, 1.0f);
+				FilterKernel.SetArg(1, 1.0f);
+				FilterKernel.SetArg(2, oclContext.ToCLImage(TestImage));
+				FilterKernel.SetArg(3, OutImage1);
+				FilterKernel.SetArg(4, sampler);
+				oclCQ.EnqueueNDRangeKernel(FilterKernel, 2, null, new IntPtr[] { OutImage1.Width, OutImage1.Height, IntPtr.Zero }, null);
+				oclCQ.EnqueueBarrier();
+				oclCQ.Finish();
+				new MainForm().ShowDialog();
+			}
 			// */
 			#endregion
 
-			new MainForm().ShowDialog();
 			Application.Exit();
 		}
 

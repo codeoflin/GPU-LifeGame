@@ -98,6 +98,12 @@
     <Compile Include="SelectForm.Designer.cs">
       <DependentUpon>SelectForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="ShowDeviceInfo.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="ShowDeviceInfo.Designer.cs">
+      <DependentUpon>ShowDeviceInfo.cs</DependentUpon>
+    </Compile>
     <Compile Include="SimpleOCLHelper.cs" />
     <EmbeddedResource Include="MainForm.resx">
       <DependentUpon>MainForm.cs</DependentUpon>
@@ -113,6 +119,9 @@
     </Compile>
     <EmbeddedResource Include="SelectForm.resx">
       <DependentUpon>SelectForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="ShowDeviceInfo.resx">
+      <DependentUpon>ShowDeviceInfo.cs</DependentUpon>
     </EmbeddedResource>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
