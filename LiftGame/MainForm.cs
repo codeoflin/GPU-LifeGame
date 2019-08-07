@@ -38,7 +38,7 @@ bool TestPoint(float x,float y,read_only image2d_t input,sampler_t sampler)
 
 constant uint4 WBGRA=(uint4)(0xFF,0xFF,0xFF,0xFF);
 constant uint4 BBGRA=(uint4)(0x00,0x00,0x00,0xFF);
-kernel void FilterImage(float outputWidth,float outputHeight,read_only image2d_t input,read_write image2d_t output,sampler_t sampler)
+kernel void FilterImage(float outputWidth,float outputHeight,read_only image2d_t input,write_only image2d_t output,sampler_t sampler)
 {
 	size_t x = get_global_id(0);
 	size_t y = get_global_id(1);
@@ -94,12 +94,12 @@ __kernel void vector_add_gpu(__global int* src_a, __global int* src_b, __global 
 		private static void Main()
 		{
 			OpenCL.GetPlatformIDs(32, new IntPtr[32], out uint num_platforms);
-			List<Device> pt = new List<Device>();
-			for (int i = 0; i < num_platforms; pt.AddRange(OpenCL.GetPlatform(i++).QueryDevices(DeviceType.ALL))) ;
-			int PT = SelectForm.Show((from Device d in pt select d.Name).ToArray());
-			if (PT == -1) return;
-			platform = pt[PT].Platform;//平台
-			oclDevice = pt[PT];//选中运算设备
+			var devices = new List<Device>();
+			for (int i = 0; i < num_platforms; i++) devices.AddRange(OpenCL.GetPlatform(i).QueryDevices(DeviceType.ALL));
+			int device = SelectForm.Show((from Device d in devices select d.Name).ToArray());
+			if (device == -1) return;
+			platform = devices[device].Platform;//平台
+			oclDevice = devices[device];//选中运算设备
 			oclContext = platform.CreateContext(new[] { (IntPtr)ContextProperties.PLATFORM, platform.PlatformID, IntPtr.Zero, IntPtr.Zero }, new[] { oclDevice }, new ContextNotify(OpenCLContextNotifyCallBack), IntPtr.Zero);//根据配置建立上下文
 			oclCQ = oclContext.CreateCommandQueue(oclDevice, CommandQueueProperties.PROFILING_ENABLE);//创建请求队列
 			if (!oclDevice.ImageSupport) return;//如果失败返回
@@ -111,47 +111,49 @@ __kernel void vector_add_gpu(__global int* src_a, __global int* src_b, __global 
 			int aaa = K2.PECount(oclDevice);
 			aaa = aaa;
 			#region 试一下用GPU做运算
-			int[] A = new[] { 1, 2, 3, 1722 };
-			int[] B = new[] { 456, 2, 1, 56 };
-			int[] C = new[] { 0, 0, 0, 0 };
-			CL.Mem n1 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, A.Length * sizeof(int), A.ToIntPtr());
-			CL.Mem n2 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, B.Length * sizeof(int), B.ToIntPtr());
+			int[] a = new[] { 1, 2, 3, 1722 };
+			int[] b = new[] { 456, 2, 1, 56 };
+			int[] c = new[] { 0, 0, 0, 0 };
+			CL.Mem n1 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, a.Length * sizeof(int), a.ToIntPtr());
+			CL.Mem n2 = oclContext.CreateBuffer(MemFlags.READ_WRITE | MemFlags.COPY_HOST_PTR, b.Length * sizeof(int), b.ToIntPtr());
 			CL.Mem n3 = null;
-			unchecked { n3 = oclContext.CreateBuffer(MemFlags.READ_WRITE, B.Length * sizeof(int), IntPtr.Zero); }
+			unchecked { n3 = oclContext.CreateBuffer(MemFlags.READ_WRITE, b.Length * sizeof(int), IntPtr.Zero); }
 			K2.SetArg(0, n1);
 			K2.SetArg(1, n2);
 			K2.SetArg(2, n3);
-			K2.SetArg(3, (int)C.Length);
-			oclCQ.EnqueueNDRangeKernel(K2, 1, null, new[] { C.Length, 0 }, null);
+			K2.SetArg(3, (int)c.Length);
+			oclCQ.EnqueueNDRangeKernel(K2, 1, null, new[] { c.Length, 0 }, null);
 			oclCQ.EnqueueBarrier();
 			oclCQ.Finish();
 			// */
 			//oclContext.WriterValues(oclCQ, n3, B);
-			C = oclContext.ReadIntValues(oclCQ, n3, C.Length);
+			c = oclContext.ReadIntValues(oclCQ, n3, c.Length);
 
-			C = C;
+			c = c;
 			// */
 			#endregion
 
-			ShowDeviceInfo SDI = new ShowDeviceInfo();
-			ListBox.ObjectCollection lb = SDI.listBox1.Items;
-			lb.Add(string.Format("Name:{0}", oclDevice.Name));
-			lb.Add(string.Format("DeviceType:{0}", oclDevice.DeviceType.ToString()));
-			lb.Add(string.Format("MaxComputeUnits(最大计算单元):{0}", oclDevice.MaxComputeUnits));
-			lb.Add(string.Format("ImageSupport:{0}", oclDevice.ImageSupport));
-			lb.Add(string.Format("AddressBits:{0}", oclDevice.AddressBits));
-			lb.Add(string.Format("DriverVersion:{0}", oclDevice.DriverVersion));
-			lb.Add(string.Format("MaxClockFrequency(最大时钟频率):{0}MHz", oclDevice.MaxClockFrequency));
-			lb.Add(string.Format("MaxMemAllocSize:{0}", oclDevice.MaxMemAllocSize));
-			lb.Add(string.Format("MaxWorkItemDimensions(最大工作维度):{0}", oclDevice.MaxWorkItemDimensions));
-			lb.Add(string.Format("MaxWorkGroupSize:{0}", oclDevice.MaxWorkGroupSize));
-			lb.Add(string.Format("Version(OpenCL版本):{0}", oclDevice.Version));
-			lb.Add(string.Format("GlobalMemSize:{0}", oclDevice.GlobalMemSize));
-			lb.Add(string.Format("Vendor(厂商):{0}", oclDevice.Vendor));
-			lb.Add(string.Format("HostUnifiedMemory(是否和Host共用内存):{0}", oclDevice.HostUnifiedMemory));
-			//SDI.ShowDialog();
+			var sdi = new ShowDeviceInfo();
+			var lb = sdi.listBox1.Items;
+			lb.Add($"Name:{oclDevice.Name}");
+			lb.Add($"DeviceType:{oclDevice.DeviceType.ToString()}");
+			lb.Add($"MaxComputeUnits(最大计算单元):{oclDevice.MaxComputeUnits}");
+			lb.Add($"ImageSupport:{oclDevice.ImageSupport}");
+			lb.Add($"AddressBits:{oclDevice.AddressBits}");
+			lb.Add($"DriverVersion:{oclDevice.DriverVersion}");
+			lb.Add($"MaxClockFrequency(最大时钟频率):{oclDevice.MaxClockFrequency}MHz");
+			lb.Add($"MaxMemAllocSize(最大内存):{oclDevice.MaxMemAllocSize / 1024 / 1024 / 1024}GB");
+			lb.Add($"MaxWorkItemDimensions(最大工作维度):{oclDevice.MaxWorkItemDimensions}");
+			lb.Add($"MaxWorkGroupSize(最大工作组数量):{oclDevice.MaxWorkGroupSize }");
+			lb.Add($"Version(OpenCL版本):{oclDevice.Version}");
+			lb.Add($"GlobalMemSize(显存):{oclDevice.GlobalMemSize / 1024 / 1024 / 1024}GB");
+			lb.Add($"GlobalMemCacheSize(显存缓存):{oclDevice.GlobalMemCacheSize / 1024}KB");
+			lb.Add($"GlobalMemCacheLineSize:{oclDevice.GlobalMemCacheLineSize}");
+			lb.Add($"Vendor(厂商):{oclDevice.Vendor}");
+			lb.Add($"HostUnifiedMemory(是否和Host共用内存):{oclDevice.HostUnifiedMemory}");
+			sdi.ShowDialog();
 			#region 调用编译好的生命游戏程序
-			if (oclDevice.DeviceType == DeviceType.GPU)
+			//if (oclDevice.DeviceType == DeviceType.GPU)
 			{
 				OutImage1 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
 				OutImage2 = oclContext.CreateImage2D(MemFlags.READ_WRITE, CL.ImageFormat.RGBA8U, TestImage.Width, TestImage.Height, 0, IntPtr.Zero);
