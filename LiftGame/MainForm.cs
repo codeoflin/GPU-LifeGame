@@ -256,7 +256,7 @@ __kernel void vector_add_gpu(__global int* src_a, __global int* src_b, __global 
 
 		private void MainForm_Load(object sender, EventArgs e)
 		{
-
+			GC.AllocateUninitializedArray<int>();
 		}
 	}
 }
